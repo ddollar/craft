@@ -1,0 +1,9 @@
+## Interface: 20400
+## Title: Craft
+## Notes: A crafter's best friend.
+## Author: Tinderbox, US-Anvilmar
+## Version: 0.1
+
+embeds.xml
+
+Craft.lua
