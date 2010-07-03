@@ -3,6 +3,7 @@
 ## Notes: A crafter's best friend.
 ## Author: Tinderbox, US-Anvilmar
 ## Version: 0.1
+## SavedVariables: CraftDB
 
 embeds.xml
 
