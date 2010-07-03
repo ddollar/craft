@@ -30,10 +30,10 @@ function TradeSkillManager:Scan(tradeskill)
 
         -- ENCHANTING
 
-        if reagentName == "Lesser Cosmic Essence" then
-          reagentName = "Greater Cosmic Essence"
-          reagentCount = reagentCount / 3
-        end
+        -- if reagentName == "Lesser Cosmic Essence" then
+        --   reagentName = "Greater Cosmic Essence"
+        --   reagentCount = reagentCount / 3
+        -- end
 
         -- END ENCHANTING
 
@@ -74,7 +74,6 @@ end
 function TradeSkillManager:RecipesMatching(tradeskill, func)
   local recipes = {}
   self:EachRecipe(tradeskill, function(recipe)
-    --self:Print("checking again: "..recipe.name)
     if func(recipe) then
       recipes[recipe.name] = recipe
     end

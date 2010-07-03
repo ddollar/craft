@@ -113,7 +113,6 @@ function AuctionManager:ScanNext()
       self.scan_auction_item = item
       self.scan_auction_page = page
       self.on_scan(item, page)
-      --self:Print("scanning reagent "..item.." on page "..page)
       QueryAuctionItems(item, nil, nil, 0, 0, 0, page)
       return
     end
@@ -125,8 +124,6 @@ end
 
 function AuctionManager:AUCTION_ITEM_LIST_UPDATE()
   if not self.scanning then return end
-
-  self:Print("scan happened")
 
   local num_auctions = GetNumAuctionItems("list")
   local name, texture, count, quality, canUse, level, minBid, minIncrement
@@ -175,7 +172,11 @@ function AuctionManager:AUCTION_ITEM_LIST_UPDATE()
       if self.scanning then self:ParseScan(item) end
     end
 
-    self.scan_queue[self.scan_auction_item] = self.scan_queue[self.scan_auction_item] + 1
+    if num_auctions == 50 then
+      self.scan_queue[self.scan_auction_item] = self.scan_queue[self.scan_auction_item] + 1
+    else
+      self.scan_queue[self.scan_auction_item] = nil
+    end
   end
 
   if self.scanning then self:ScheduleTimer("ScanNext", 0.5) end

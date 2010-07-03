@@ -1,4 +1,4 @@
-local Craft  = LibStub("AceAddon-3.0"):NewAddon("Craft", "AceEvent-3.0")
+Craft  = LibStub("AceAddon-3.0"):NewAddon("Craft", "AceEvent-3.0")
 
 local AceConfig = LibStub("AceConfig-3.0")
 local AceGUI    = LibStub("AceGUI-3.0")
@@ -8,17 +8,12 @@ local InventoryManager  = LibStub("InventoryManager-1.0")
 local TradeSkillManager = LibStub("TradeSkillManager-1.0")
 
 AuctionManager:OnScan(function(item, page)
-  Craft.frame.scan.label:SetText("Scanning Page "..(page+1).." of "..item)
+  Craft:UpdateLabel("scan", "Scanning Page "..(page+1).." of "..item)
 end)
 
 AuctionManager:OnScanComplete(function()
-  Craft.frame.scan.label:SetText("Scan Complete")
+  Craft:UpdateLabel("scan", "Scan Complete")
   Craft.db.char.auction_database = AuctionManager.database
-end)
-
-AuctionManager:OnBuyApproval(function(name, count, cost)
-  Craft.frame.reagents.label:SetText("Buy "..count.." of "..name.." for "..cost)
-  Craft.is_buying = true
 end)
 
 function Craft:OnInitialize()
@@ -132,19 +127,6 @@ local function CreateCraftFrame()
   return(frame)
 end
 
--- local function FormatMoney(money)
---   local g = math.floor(money / 10000)
---   local s = math.floor(money % 10000 / 100)
---   local c = math.floor(money % 100)
---   if g > 0 then
---     return string.format("|cffffd700%d|r.|cffc7c7cf%02d|r.|cffeda55f%02d|r", g, s, c)
---   elseif s > 0 then
---     return string.format("|cffc7c7cf%d|r.|cffeda55f%02d|r", s, c)
---   else
---     return string.format("|cffc7c7cf0|r.|cffeda55f%02d|r", c)
---   end
--- end
-
 -- EVENTS ####################################################################
 
 function Craft:RegisterEvents()
@@ -197,6 +179,9 @@ end
 function Craft:Optimize()
   TradeSkillManager:Scan("Enchanting")
 
+  self:UpdateLabel("next_reagent", "")
+  self:UpdateLabel("buy_reagent", "")
+
   local recipes = Craft:ModernRecipes()
   local recipe_revenue, recipe_cost, reagent_cost
 
@@ -243,7 +228,7 @@ function Craft:Optimize()
       end
 
       -- if it's profitable enough, make it
-      if (recipe_revenue / recipe_cost) > 1.5 then
+      if (recipe_revenue / recipe_cost) > 1.4 then
         local already_made = InventoryManager:OnHand(recipe.name)
         local num_to_make = (3 - already_made)
 
@@ -251,21 +236,18 @@ function Craft:Optimize()
           num_to_make = num_to_make - my_auctions[recipe.name]
         end
 
-        total_items = total_items + num_to_make
-        total_cost = total_cost + (num_to_make * recipe_cost)
-        total_revenue = total_revenue + (num_to_make * recipe_revenue)
+        if num_to_make > 0 then
+          total_items = total_items + num_to_make
+          total_cost = total_cost + (num_to_make * recipe_cost)
+          total_revenue = total_revenue + (num_to_make * recipe_revenue)
 
-        self.recipe_queue[recipe.name] = num_to_make
+          self.recipe_queue[recipe.name] = num_to_make
+        end
       end
     end
   end
 
-  for r,n in pairs(self.recipe_queue) do
-    self:Print(r..":"..n)
-  end
-
-  self.frame.optimize.label:SetText(total_items.." recipes, "..
-    total_cost.." cost, "..total_revenue.." revenue")
+  self:UpdateLabel("optimize", total_items.." recipes, ".. total_cost.." cost, "..total_revenue.." revenue")
 
   self.reagent_queue = {}
 
@@ -326,13 +308,15 @@ function Craft:BuyReagents()
     buyoutPrice, bidAmount, highBidder, owner,
     saleStatus = GetAuctionItemInfo("list", i);
 
-    table.insert(reagents, {
-      name  = name,
-      index = i,
-      price = math.floor(buyoutPrice / count / 100) / 100,
-      count = count,
-      total = buyoutPrice
-    })
+    if name == self.current_buy_reagent then
+      table.insert(reagents, {
+        name  = name,
+        index = i,
+        price = math.floor(buyoutPrice / count / 100) / 100,
+        count = count,
+        total = buyoutPrice
+      })
+    end
   end
 
   table.sort(reagents, function(a, b)
@@ -343,6 +327,7 @@ function Craft:BuyReagents()
     if reagent.price < median then
       self:Print("would buy "..reagent.count.." of "..reagent.name)
       self.current_buy_amount = self.current_buy_amount - reagent.count
+      if self.current_buy_amount <= 0 then return end
       self:UpdateLabel("buy_reagent", self.current_buy_amount .. " needed")
       PlaceAuctionBid("list", reagent.index, reagent.total)
     else
@@ -352,20 +337,24 @@ function Craft:BuyReagents()
 end
 
 function Craft:Craft()
-  self.recipe_queue[self.make_next] = self.recipe_queue[self.make_next] - 1
-  TradeSkillManager:Make("Enchanting", self.make_next, 1)
+  if self.make_next then
+    self.recipe_queue[self.make_next] = self.recipe_queue[self.make_next] - 1
+    TradeSkillManager:Make("Enchanting", self.make_next, 1)
 
-  if self.make_next:match("eapon") or self.make_next:match("taff") then
-    InventoryManager:Use("Weapon Vellum III")
-  else
-    InventoryManager:Use("Armor Vellum III")
+    if self.make_next:match("eapon") or self.make_next:match("taff") then
+      InventoryManager:Use("Weapon Vellum III")
+    else
+      InventoryManager:Use("Armor Vellum III")
+    end
+
+    if self.recipe_queue[self.make_next] <= 0 then
+      self.recipe_queue[self.make_next] = nil
+      self.make_next = nil
+      self:UpdateLabel("craft", "")
+    end
+
+    self:PrepareNextCraft()
   end
-
-  if self.recipe_queue[self.make_next] <= 0 then
-    self.recipe_queue[self.make_next] = nil
-  end
-
-  self:PrepareNextCraft()
 end
 
 -- PRIVATE ###################################################################
