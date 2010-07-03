@@ -5,15 +5,10 @@ if not AuctionManager then return end
 AuctionManager.database = {}
 AuctionManager.scan_queue = {}
 AuctionManager.last_scanned = {}
-AuctionManager.buy_queue = {}
-AuctionManager.temp_buy_queue = {}
-AuctionManager.selected_buys = {}
 AuctionManager.scanning = false
-AuctionManager.buying   = false
 
 AuctionManager.on_scan = function(item, page) end
 AuctionManager.on_scan_complete = function() end
-AuctionManager.on_buy_approval = function(name, count, cost) end
 
 -- PUBLIC API ################################################################
 
@@ -25,14 +20,6 @@ function AuctionManager:Scan(name)
   self.scan_queue[name] = 0
   self:StartScanning()
   self:ScheduleTimer("ScanNext", 0.5)
-end
-
-function AuctionManager:Buy(name, count)
-  self:Print("will buy "..count.." of "..name)
-  self.buying = true
-  self.buy_queue[name] = count
-  self.scan_queue[name] = 0
-  self:StartScanning()
 end
 
 function AuctionManager:MinimumPrice(name)
@@ -73,10 +60,6 @@ end
 
 function AuctionManager:OnScanComplete(func)
   AuctionManager.on_scan_complete = func
-end
-
-function AuctionManager:OnBuyApproval(func)
-  AuctionManager.on_buy_approval = func
 end
 
 -- PRIVATE ###################################################################
@@ -137,12 +120,11 @@ function AuctionManager:ScanNext()
   end
 
   self.scanning = false
-  self.buying = false
   self.on_scan_complete()
 end
 
 function AuctionManager:AUCTION_ITEM_LIST_UPDATE()
-  if not (self.scanning or self.buying) then return end
+  if not self.scanning then return end
 
   self:Print("scan happened")
 
@@ -163,19 +145,6 @@ function AuctionManager:AUCTION_ITEM_LIST_UPDATE()
     end
 
     if num_ownerless > 0 then return end
-
-    for item, count in pairs(AuctionManager.temp_buy_queue) do
-      AuctionManager.temp_buy_queue[item] = nil
-    end
-
-    for item, count in pairs(AuctionManager.buy_queue) do
-      AuctionManager.temp_buy_queue[item] = count
-    end
-
-    self:Print("temp buy queue")
-    for item, count in pairs(AuctionManager.temp_buy_queue) do
-      self:Print(item.." "..count)
-    end
 
     local items = {}
 
@@ -204,65 +173,16 @@ function AuctionManager:AUCTION_ITEM_LIST_UPDATE()
 
     for _, item in pairs(items) do
       if self.scanning then self:ParseScan(item) end
-      if self.buying then self:ParseBuy(item) end
     end
 
     self.scan_queue[self.scan_auction_item] = self.scan_queue[self.scan_auction_item] + 1
   end
 
   if self.scanning then self:ScheduleTimer("ScanNext", 0.5) end
-  if self.buying then self:PresentBuysForApproval() end
 end
 
 function AuctionManager:ParseScan(item)
   self:SaveItem(item)
-end
-
-function AuctionManager:ParseBuy(item)
-  if self.buy_queue[item.name] <= 0 then return end
-
-  if item.price <= self:MedianPrice(item.name) then
-    if self.temp_buy_queue[item.name] > 0 then
-      self:Print("selected "..item.index.." to be bought for "..item.real_total)
-      self.selected_buys[item.index] = item
-      self.temp_buy_queue[item.name] = self.temp_buy_queue[item.name] - item.count
-    end
-  end
-end
-
-function AuctionManager:PresentBuysForApproval()
-  local count = 0
-  local cost = 0
-  local name
-
-  for index, item in pairs(self.selected_buys) do
-    name = item.name
-    count = count + item.count
-    cost = cost + item.total
-  end
-
-  if count > 0 then
-    self:Print("seeking approval")
-    self.buying = false
-    self.on_buy_approval(name, count, cost)
-  else
-    self:Print("continuing scan")
-    self:ScheduleTimer("ScanNext", 0.5)
-  end
-end
-
-function AuctionManager:ApproveBuys()
-  local item
-
-  for _, item in pairs(self.selected_buys) do
-    self.buy_queue[item.name] = self.buy_queue[item.name] - item.count
-    PlaceAuctionBid("list", item.index, item.real_total)
-    self.selected_buys[index] = nil
-  end
-
-  self:Print("continuing scan")
-  self.buying = true
-  self:ScheduleTimer("ScanNext", 3)
 end
 
 function AuctionManager:Print(message)
