@@ -75,9 +75,9 @@ local function CreateCraftFrame()
   frame:SetPoint("TOPLEFT", AuctionFrame, "TOPRIGHT", 10, -10)
 
   -- container frame
-  frame:SetFrameStrata("FULLSCREEN_DIALOG")
+  frame:SetFrameStrata("MEDIUM")
   frame:SetWidth(470)
-  frame:SetHeight(200)
+  frame:SetHeight(235)
   frame:SetBackdrop({
     bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background.blp",
     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
@@ -122,6 +122,14 @@ local function CreateCraftFrame()
   frame.craft.button:SetText("Craft")
   frame.craft.button:SetScript("OnClick", function(self)
     Craft:Craft()
+  end)
+
+  frame.cancel_all = CreateTableRow(frame)
+  frame.cancel_all:SetPoint("TOPLEFT",  frame.craft, "BOTTOMLEFT",  0, -10)
+  frame.cancel_all:SetPoint("TOPRIGHT", frame.craft, "BOTTOMRIGHT", 0, -10)
+  frame.cancel_all.button:SetText("Cancel All")
+  frame.cancel_all.button:SetScript("OnClick", function(self)
+    Craft:CancelAll()
   end)
 
   return(frame)
@@ -206,7 +214,7 @@ function Craft:Optimize()
 
   for _, recipe in pairs(recipes) do
     recipe_revenue = AuctionManager:MinimumPrice(recipe.name)
-    if recipe_revenue then
+    if recipe_revenue and recipe.name ~= "Scroll of Enchant Gloves - Gatherer" then
 
       recipe_cost = 0
 
@@ -289,6 +297,7 @@ function Craft:NextReagent()
     self.current_buy_reagent = reagent
     self.current_buy_amount = count
     QueryAuctionItems(reagent)
+    BrowseName:SetText(reagent);
     self.reagent_queue[reagent] = nil
     return
   end
@@ -324,12 +333,12 @@ function Craft:BuyReagents()
   end)
 
   for _, reagent in pairs(reagents) do
-    if reagent.price < median then
+    if reagent.price <= median then
       self:Print("would buy "..reagent.count.." of "..reagent.name)
-      self.current_buy_amount = self.current_buy_amount - reagent.count
-      if self.current_buy_amount <= 0 then return end
-      self:UpdateLabel("buy_reagent", self.current_buy_amount .. " needed")
       PlaceAuctionBid("list", reagent.index, reagent.total)
+      self.current_buy_amount = self.current_buy_amount - reagent.count
+      self:UpdateLabel("buy_reagent", self.current_buy_amount .. " needed")
+      if self.current_buy_amount <= 0 then return end
     else
       self:Print("skipping "..reagent.price.."  "..median)
     end
@@ -354,6 +363,20 @@ function Craft:Craft()
     end
 
     self:PrepareNextCraft()
+  end
+end
+
+function Craft:CancelAll()
+  local num_auctions = GetNumAuctionItems("owner")
+
+  for i = 1, num_auctions do
+     local name, texture, count, quality, canUse, level, 
+     minBid, minIncrement, buyoutPrice, bidAmount, highBidder, 
+     owner, saleStatus = GetAuctionItemInfo("owner", i);
+
+     if (saleStatus == 0) then
+        CancelAuction(i)
+     end
   end
 end
 
