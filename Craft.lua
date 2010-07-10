@@ -26,6 +26,16 @@ function Craft:OnInitialize()
   self.is_buying = false
   self.make_next = nil
 
+  self.player_name = GetUnitName("player")
+
+  if self.player_name == "Tinderbox" then
+    self.current_tradeskill = "Enchanting"
+  elseif self.player_name == "Tinderböx" then
+    self.current_tradeskill = "Inscription"
+  end
+
+  self:Print("TS:"..self.current_tradeskill)
+
   self.db = LibStub("AceDB-3.0"):New("CraftDB")
 
   if self.db.char.auction_database then
@@ -72,7 +82,6 @@ end
 
 local function CreateCraftFrame()
   local frame = CreateFrame("Frame", nil, UIParent)
-  frame:SetPoint("TOPLEFT", AuctionFrame, "TOPRIGHT", 10, -10)
 
   -- container frame
   frame:SetFrameStrata("MEDIUM")
@@ -140,22 +149,33 @@ end
 function Craft:RegisterEvents()
   self:RegisterEvent("AUCTION_HOUSE_SHOW")
   self:RegisterEvent("AUCTION_HOUSE_CLOSED")
+  self:RegisterEvent("MERCHANT_SHOW")
+  self:RegisterEvent("MERCHANT_CLOSED")
 end
 
 function Craft:AUCTION_HOUSE_SHOW()
-  self:ShowFrame()
+  self:ShowFrame(AuctionFrame)
 end
 
 function Craft:AUCTION_HOUSE_CLOSED()
   self:HideFrame()
 end
 
+function Craft:MERCHANT_SHOW()
+  self:ShowFrame(MerchantFrame)
+end
+
+function Craft:MERCHANT_CLOSED()
+  self:HideFrame()
+end
+
 -- FRAMES ####################################################################
 
-function Craft:ShowFrame()
+function Craft:ShowFrame(anchor)
   if not self.frame then
     self.frame = CreateCraftFrame()
   end
+  self.frame:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 10, -10)
   self.frame:Show()
 end
 
@@ -172,7 +192,9 @@ function Craft:Print(message)
 end
 
 function Craft:Scan()
-  TradeSkillManager:Scan("Enchanting")
+  if not self.current_tradeskill then return end
+
+  TradeSkillManager:Scan(self.current_tradeskill)
 
   local recipes = Craft:ModernRecipes()
 
@@ -185,6 +207,11 @@ function Craft:Scan()
 end
 
 function Craft:Optimize()
+  local optimizer = "Optimize" .. self.current_tradeskill
+  if Craft[optimizer] then Craft[optimizer](Craft) end
+end
+
+function Craft:OptimizeEnchanting()
   TradeSkillManager:Scan("Enchanting")
 
   self:UpdateLabel("next_reagent", "")
@@ -282,6 +309,80 @@ function Craft:Optimize()
   self:PrepareNextCraft()
 end
 
+function Craft:OptimizeInscription()
+  TradeSkillManager:Scan("Inscription")
+
+  self:UpdateLabel("next_reagent", "")
+  self:UpdateLabel("buy_reagent", "")
+
+  local recipes = Craft:ModernRecipes()
+  local recipe_revenue, recipe_cost, reagent_cost
+
+  InventoryManager:Scan()
+
+  total_items = 0
+  total_revenue = 0
+
+  self.recipe_queue = {}
+
+  local my_auctions = {}
+  for i = 1, GetNumAuctionItems("owner") do
+     name, texture, count, quality, canUse, level, minBid, minIncrement, buyoutPrice, bidAmount, highBidder, owner, saleStatus = GetAuctionItemInfo("owner", i);
+     if saleStatus == 0 then
+        if type(my_auctions[name]) == "nil" then
+           my_auctions[name] = 0
+        end
+        my_auctions[name] = my_auctions[name] + count
+     end
+  end
+
+  for _, recipe in pairs(recipes) do
+    recipe_revenue = AuctionManager:MinimumPrice(recipe.name)
+
+    if recipe_revenue and recipe_revenue > 15 then
+      local already_made = InventoryManager:OnHand(recipe.name)
+      local num_to_make = (3 - already_made)
+
+      if my_auctions[recipe.name] then
+        num_to_make = num_to_make - my_auctions[recipe.name]
+      end
+
+      if num_to_make > 0 then
+        total_items = total_items + num_to_make
+        total_revenue = total_revenue + (num_to_make * recipe_revenue)
+
+        self.recipe_queue[recipe.name] = num_to_make
+      end
+    end
+  end
+
+  self:UpdateLabel("optimize", total_items.." recipes, "..total_revenue.." revenue")
+
+  self.reagent_queue = {}
+
+  local recipes = Craft:ModernRecipes()
+
+  for recipe, num in pairs(self.recipe_queue) do
+    for _, reagent in pairs(recipes[recipe].reagents) do
+      if not self.reagent_queue[reagent.name] then self.reagent_queue[reagent.name] = 0 end
+      self.reagent_queue[reagent.name] = self.reagent_queue[reagent.name] + (reagent.count * num)
+    end
+  end
+
+  InventoryManager:Scan()
+
+  for reagent, count in pairs(self.reagent_queue) do
+    count = count - InventoryManager:OnHand(reagent)
+    if count > 0 then
+      self.reagent_queue[reagent] = math.ceil(count)
+    else
+      self.reagent_queue[reagent] = nil
+    end
+  end
+
+  self:PrepareNextCraft()
+end
+
 function Craft:NextReagent()
   local reagent, count
 
@@ -297,13 +398,21 @@ function Craft:NextReagent()
     self.current_buy_reagent = reagent
     self.current_buy_amount = count
     QueryAuctionItems(reagent)
-    BrowseName:SetText(reagent);
+    if BrowseName then BrowseName:SetText(reagent); end
     self.reagent_queue[reagent] = nil
     return
   end
 end
 
 function Craft:BuyReagents()
+  if GetMerchantNumItems() == 0 then
+    Craft:BuyReagentsAuction()
+  else
+    Craft:BuyReagentsMerchant()
+  end
+end
+
+function Craft:BuyReagentsAuction()
   local num_auctions = GetNumAuctionItems("list")
   local name, texture, count, quality, canUse, level, minBid, minIncrement
   local buyoutPrice, bidAmount, highBidder, owner, saleStatus
@@ -334,7 +443,6 @@ function Craft:BuyReagents()
 
   for _, reagent in pairs(reagents) do
     if reagent.price <= median then
-      self:Print("would buy "..reagent.count.." of "..reagent.name)
       PlaceAuctionBid("list", reagent.index, reagent.total)
       self.current_buy_amount = self.current_buy_amount - reagent.count
       self:UpdateLabel("buy_reagent", self.current_buy_amount .. " needed")
@@ -345,16 +453,42 @@ function Craft:BuyReagents()
   end
 end
 
+function Craft:BuyReagentsMerchant()
+  local i, j
+  local name, texture, price, quantity, numAvailable, isUsable, extendedCost
+  local buy_count
+
+  for i = 1, GetMerchantNumItems() do
+    name, texture, price, quantity, numAvailable, isUsable, 
+      extendedCost = GetMerchantItemInfo(i)
+
+    if name == self.current_buy_reagent then
+      buy_count = math.ceil(self.current_buy_amount / quantity)
+      for j = 1, buy_count do
+        BuyMerchantItem(i, 1)
+        self.current_buy_amount = self.current_buy_amount - 1
+        self:UpdateLabel("buy_reagent", self.current_buy_amount .. " needed")
+      end
+    end
+  end
+end
+
 function Craft:Craft()
   if self.make_next then
     self.recipe_queue[self.make_next] = self.recipe_queue[self.make_next] - 1
-    TradeSkillManager:Make("Enchanting", self.make_next, 1)
+    TradeSkillManager:Make(self.current_tradeskill, self.make_next, 1)
 
-    if self.make_next:match("eapon") or self.make_next:match("taff") then
-      InventoryManager:Use("Weapon Vellum III")
-    else
-      InventoryManager:Use("Armor Vellum III")
+    -- ENCHANTING
+
+    if self.current_tradeskill == "Enchanting" then
+      if self.make_next:match("eapon") or self.make_next:match("taff") then
+        InventoryManager:Use("Weapon Vellum III")
+      else
+        InventoryManager:Use("Armor Vellum III")
+      end
     end
+
+    -- END ENCHANTING
 
     if self.recipe_queue[self.make_next] <= 0 then
       self.recipe_queue[self.make_next] = nil
@@ -370,8 +504,8 @@ function Craft:CancelAll()
   local num_auctions = GetNumAuctionItems("owner")
 
   for i = 1, num_auctions do
-     local name, texture, count, quality, canUse, level, 
-     minBid, minIncrement, buyoutPrice, bidAmount, highBidder, 
+     local name, texture, count, quality, canUse, level,
+     minBid, minIncrement, buyoutPrice, bidAmount, highBidder,
      owner, saleStatus = GetAuctionItemInfo("owner", i);
 
      if (saleStatus == 0) then
@@ -382,21 +516,34 @@ end
 
 -- PRIVATE ###################################################################
 
-local MODERN_REAGENTS = { 'Abyss Crystal', 'Dream Shard',
+function Craft:ModernRecipes()
+  local modern = "ModernRecipes" .. self.current_tradeskill
+  if Craft[modern] then return Craft[modern](Craft) end
+end
+
+local MODERN_REAGENTS_ENCHANTING = { 'Abyss Crystal', 'Dream Shard',
   "Greater Cosmic Essence", "Lesser Cosmic Essence", "Infinite Dust" }
 
-function Craft:ModernRecipes()
+function Craft:ModernRecipesEnchanting()
   local recipes = TradeSkillManager:RecipesMatching("Enchanting", function(recipe)
     local modern = false
     local reagent, modern_reagent
 
     for reagent, _ in pairs(recipe.reagents) do
-      for _, modern_reagent in pairs(MODERN_REAGENTS) do
+      for _, modern_reagent in pairs(MODERN_REAGENTS_ENCHANTING) do
         if reagent == modern_reagent then modern = true end
       end
     end
 
     return modern
+  end)
+
+  return recipes
+end
+
+function Craft:ModernRecipesInscription()
+  local recipes = TradeSkillManager:RecipesMatching("Inscription", function(recipe)
+    return string.match(recipe.name, "^Glyph of")
   end)
 
   return recipes

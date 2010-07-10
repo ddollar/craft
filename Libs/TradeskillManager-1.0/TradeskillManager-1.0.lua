@@ -45,19 +45,21 @@ function TradeSkillManager:Scan(tradeskill)
 
       -- ENCHANTING SPECIFIC
 
-      if skillName:match("eapon") or skillName:match("taff") then
-        reagents["Weapon Vellum III"] = {
-          name = "Weapon Vellum III",
-          count = 1
-        }
-      else
-        reagents["Armor Vellum III"] = {
-          name = "Armor Vellum III",
-          count = 1
-        }
-      end
+      if tradeskill == "Enchanting" then
+        if skillName:match("eapon") or skillName:match("taff") then
+          reagents["Weapon Vellum III"] = {
+            name = "Weapon Vellum III",
+            count = 1
+          }
+        else
+          reagents["Armor Vellum III"] = {
+            name = "Armor Vellum III",
+            count = 1
+          }
+        end
 
-      skillName = "Scroll of " .. skillName
+        skillName = "Scroll of " .. skillName
+      end
 
       -- END ENCHANTING
 
