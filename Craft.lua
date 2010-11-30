@@ -1,6 +1,5 @@
 Craft  = LibStub("AceAddon-3.0"):NewAddon("Craft", "AceEvent-3.0")
 
-local AceConfig = LibStub("AceConfig-3.0")
 local AceGUI    = LibStub("AceGUI-3.0")
 
 local AuctionManager    = LibStub("AuctionManager-1.0")
@@ -426,7 +425,7 @@ function Craft:BuyReagentsAuction()
     buyoutPrice, bidAmount, highBidder, owner,
     saleStatus = GetAuctionItemInfo("list", i);
 
-    if name == self.current_buy_reagent then
+    if name == self.current_buy_reagent and buyoutPrice ~= 0 then
       table.insert(reagents, {
         name  = name,
         index = i,
@@ -446,7 +445,7 @@ function Craft:BuyReagentsAuction()
       PlaceAuctionBid("list", reagent.index, reagent.total)
       self.current_buy_amount = self.current_buy_amount - reagent.count
       self:UpdateLabel("buy_reagent", self.current_buy_amount .. " needed")
-      if self.current_buy_amount <= 0 then return end
+      return
     else
       self:Print("skipping "..reagent.price.."  "..median)
     end
@@ -481,11 +480,7 @@ function Craft:Craft()
     -- ENCHANTING
 
     if self.current_tradeskill == "Enchanting" then
-      if self.make_next:match("eapon") or self.make_next:match("taff") then
-        InventoryManager:Use("Weapon Vellum III")
-      else
-        InventoryManager:Use("Armor Vellum III")
-      end
+      InventoryManager:Use("Enchanting Vellum")
     end
 
     -- END ENCHANTING

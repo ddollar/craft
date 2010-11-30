@@ -21,7 +21,6 @@ function InventoryManager:Scan()
          color, ltype, id, enchant, gem1, gem2, gem3, gem4, suffix, unique,
            link_level, name = self:ParseItemLink(item_link)
          texture, itemCount, locked, quality, readable = GetContainerItemInfo(container, slot)
-
          if not self.database[name] then
            self.database[name] = 0
          end
@@ -74,8 +73,8 @@ function InventoryManager:Print(message)
 end
 
 function InventoryManager:ParseItemLink(link)
-  local _, _, color, ltype, id, enchant, gem1, gem2, gem3, gem4, suffix, unique, link_level, name =
-    string.find(link, "|?c?f?f?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?(%-?%d*):?(%-?%d*):?(%d*)|?h?%[?([^%[%]]*)%]?|?h?|?r?")
+  local _, _, color, ltype, id, enchant, gem1, gem2, gem3, gem4, suffix, unique, link_level, unk, name =
+    string.find(link, "|?c?f?f?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?(%-?%d*):?(%-?%d*):?(%d*):?(%d*)|?h?%[?([^%[%]]*)%]?|?h?|?r?")
   return color, ltype, id, enchant, gem1, gem2, gem3, gem4, suffix, unique, link_level, name
 end
 

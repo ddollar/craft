@@ -28,6 +28,10 @@ function TradeSkillManager:Scan(tradeskill)
       for j = 1, num_reagents do
         reagentName, reagentTexture, reagentCount, playerReagentCount = GetTradeSkillReagentInfo(i, j)
 
+        if reagentName == nil then
+          break
+        end
+
         -- ENCHANTING
 
         -- if reagentName == "Lesser Cosmic Essence" then
@@ -46,18 +50,10 @@ function TradeSkillManager:Scan(tradeskill)
       -- ENCHANTING SPECIFIC
 
       if tradeskill == "Enchanting" then
-        if skillName:match("eapon") or skillName:match("taff") then
-          reagents["Weapon Vellum III"] = {
-            name = "Weapon Vellum III",
-            count = 1
-          }
-        else
-          reagents["Armor Vellum III"] = {
-            name = "Armor Vellum III",
-            count = 1
-          }
-        end
-
+        reagents["Enchanting Vellum"] = {
+          name = "Enchanting Vellum",
+          count = 1
+        }
         skillName = "Scroll of " .. skillName
       end
 
