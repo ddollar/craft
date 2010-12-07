@@ -33,8 +33,6 @@ function Craft:OnInitialize()
     self.current_tradeskill = "Inscription"
   end
 
-  self:Print("TS:"..self.current_tradeskill)
-
   self.db = LibStub("AceDB-3.0"):New("CraftDB")
 
   if self.db.char.auction_database then
@@ -135,9 +133,9 @@ local function CreateCraftFrame()
   frame.cancel_all = CreateTableRow(frame)
   frame.cancel_all:SetPoint("TOPLEFT",  frame.craft, "BOTTOMLEFT",  0, -10)
   frame.cancel_all:SetPoint("TOPRIGHT", frame.craft, "BOTTOMRIGHT", 0, -10)
-  frame.cancel_all.button:SetText("Cancel All")
+  frame.cancel_all.button:SetText("Cancel")
   frame.cancel_all.button:SetScript("OnClick", function(self)
-    Craft:CancelAll()
+    Craft:Cancel()
   end)
 
   return(frame)
@@ -495,7 +493,7 @@ function Craft:Craft()
   end
 end
 
-function Craft:CancelAll()
+function Craft:Cancel()
   local num_auctions = GetNumAuctionItems("owner")
 
   for i = 1, num_auctions do
@@ -505,6 +503,7 @@ function Craft:CancelAll()
 
      if (saleStatus == 0) then
         CancelAuction(i)
+        return
      end
   end
 end
