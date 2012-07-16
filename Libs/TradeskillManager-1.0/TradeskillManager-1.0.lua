@@ -50,10 +50,6 @@ function TradeSkillManager:Scan(tradeskill)
       -- ENCHANTING SPECIFIC
 
       if tradeskill == "Enchanting" then
-        reagents["Enchanting Vellum"] = {
-          name = "Enchanting Vellum",
-          count = 1
-        }
         skillName = "Scroll of " .. skillName
       end
 

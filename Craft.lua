@@ -456,7 +456,7 @@ function Craft:BuyReagentsMerchant()
   local buy_count
 
   for i = 1, GetMerchantNumItems() do
-    name, texture, price, quantity, numAvailable, isUsable, 
+    name, texture, price, quantity, numAvailable, isUsable,
       extendedCost = GetMerchantItemInfo(i)
 
     if name == self.current_buy_reagent then
@@ -515,8 +515,18 @@ function Craft:ModernRecipes()
   if Craft[modern] then return Craft[modern](Craft) end
 end
 
-local MODERN_REAGENTS_ENCHANTING = { 'Abyss Crystal', 'Dream Shard',
-  "Greater Cosmic Essence", "Lesser Cosmic Essence", "Infinite Dust" }
+local MODERN_REAGENTS_ENCHANTING = {
+  -- "Abyss Crystal",
+  -- "Dream Shard",
+  -- "Greater Cosmic Essence",
+  -- "Lesser Cosmic Essence",
+  -- "Infinite Dust",
+  "Maelstrom Crystal",
+  "Heavenly Shard",
+  "Greater Celestial Essence",
+  "Lesser Celestial Essence",
+  "Hypnotic Dust"
+}
 
 function Craft:ModernRecipesEnchanting()
   local recipes = TradeSkillManager:RecipesMatching("Enchanting", function(recipe)
